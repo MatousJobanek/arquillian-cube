@@ -1,34 +1,5 @@
 package org.arquillian.cube.docker.impl.client.reporter;
 
-import com.github.dockerjava.api.command.InspectContainerResponse;
-import com.github.dockerjava.api.model.Version;
-import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
-import com.mxgraph.layout.mxIGraphLayout;
-import com.mxgraph.util.mxCellRenderer;
-import com.mxgraph.util.mxConstants;
-import com.mxgraph.view.mxGraph;
-import org.arquillian.cube.docker.impl.client.CubeDockerConfiguration;
-import org.arquillian.cube.docker.impl.client.config.CubeContainer;
-import org.arquillian.cube.docker.impl.client.config.DockerCompositions;
-import org.arquillian.cube.docker.impl.client.config.Link;
-import org.arquillian.cube.docker.impl.client.utils.NumberConversion;
-import org.arquillian.cube.docker.impl.docker.DockerClientExecutor;
-import org.arquillian.cube.docker.impl.reporter.DockerContainerSection;
-import org.arquillian.cube.spi.CubeRegistry;
-import org.arquillian.cube.spi.event.lifecycle.AfterAutoStart;
-import org.arquillian.reporter.api.builder.Reporter;
-import org.arquillian.reporter.api.builder.report.ReportBuilder;
-import org.arquillian.reporter.api.event.SectionEvent;
-import org.arquillian.reporter.api.model.entry.FileEntry;
-import org.arquillian.reporter.config.ReporterConfiguration;
-import org.jboss.arquillian.core.api.Event;
-import org.jboss.arquillian.core.api.annotation.Inject;
-import org.jboss.arquillian.core.api.annotation.Observes;
-import org.jboss.arquillian.test.spi.event.suite.After;
-import org.jboss.arquillian.test.spi.event.suite.Before;
-
-import javax.imageio.ImageIO;
-import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -39,12 +10,69 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.*;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+
+import com.github.dockerjava.api.command.InspectContainerResponse;
+import com.github.dockerjava.api.model.Statistics;
+import com.github.dockerjava.api.model.Version;
+import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
+import com.mxgraph.layout.mxIGraphLayout;
+import com.mxgraph.util.mxCellRenderer;
+import com.mxgraph.util.mxConstants;
+import com.mxgraph.view.mxGraph;
+import org.arquillian.cube.docker.impl.client.CubeDockerConfiguration;
+import org.arquillian.cube.docker.impl.client.config.CubeContainer;
+import org.arquillian.cube.docker.impl.client.config.DockerCompositions;
+import org.arquillian.cube.docker.impl.client.config.Link;
+import org.arquillian.cube.docker.impl.docker.DockerClientExecutor;
+import org.arquillian.cube.docker.impl.reporter.DockerContainerSection;
+import org.arquillian.cube.spi.Cube;
+import org.arquillian.cube.spi.CubeRegistry;
+import org.arquillian.cube.spi.event.lifecycle.AfterAutoStart;
+import org.arquillian.reporter.api.builder.Reporter;
+import org.arquillian.reporter.api.builder.entry.DataCollectionBuilder;
+import org.arquillian.reporter.api.builder.report.ReportBuilder;
+import org.arquillian.reporter.api.event.SectionEvent;
+import org.arquillian.reporter.api.event.TestMethodSection;
+import org.arquillian.reporter.api.model.entry.FileEntry;
+import org.arquillian.reporter.api.model.entry.data.DataCollectionEntry;
+import org.arquillian.reporter.api.model.entry.data.Label;
+import org.arquillian.reporter.config.ReporterConfiguration;
+import org.jboss.arquillian.core.api.Event;
+import org.jboss.arquillian.core.api.annotation.Inject;
+import org.jboss.arquillian.core.api.annotation.Observes;
+import org.jboss.arquillian.test.spi.event.suite.After;
+import org.jboss.arquillian.test.spi.event.suite.Before;
+
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.DOCKER_API_VERSION;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.DOCKER_ARCH;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.DOCKER_COMPOSITION_SCHEMA;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.DOCKER_ENVIRONMENT;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.DOCKER_HOST_INFORMATION;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.DOCKER_KERNEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.DOCKER_OS;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.DOCKER_VERSION;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.LOG_PATH;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.MEMORY_STATISTICS;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerEnvironmentReportKey.NETWORK_TOPOLOGY_SCHEMA;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.ADAPTER_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.AFTER_TEST_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.BEFORE_TEST_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.IO_BYTES_READ_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.IO_BYTES_WRITE_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.LIMIT_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.MAX_USAGE_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.RX_BYTES_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.TX_BYTES_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.USAGE_LABEL;
+import static org.arquillian.cube.docker.impl.client.reporter.DockerLabels.USE_LABEL;
 
 /**
  * Class that reports generic Docker information like orchestration or docker version.
@@ -53,8 +81,8 @@ public class TakeDockerEnvironment {
 
     private static Logger log = Logger.getLogger(TakeDockerEnvironment.class.getName());
     private static FileEntry EMPTY_SCREENSHOT = new FileEntry((String) null);
-    private CubeStatistics statsBeforeMethod;
-    private CubeStatistics statsAfterMethod;
+    private static CubeStatistics statsBeforeMethod;
+    private static CubeStatistics statsAfterMethod;
 
     @Inject
     Event<SectionEvent> reportEvent;
@@ -97,107 +125,95 @@ public class TakeDockerEnvironment {
         }
     }
 
-   /** private PropertyEntry createContainerStatsIOGroup(Boolean decimal) {
+    private DataCollectionEntry createContainerStatsIOGroup(Boolean decimal) {
 
-        GroupEntry groupEntry = new GroupEntry("IO statistics");
-        TableEntry tableEntry = new TableEntry();
+        DataCollectionBuilder bytesReadBuilder =
+            generateDataCollection(TakeDockerEnvironment.statsBeforeMethod.getIoBytesRead(),
+                                   TakeDockerEnvironment.statsAfterMethod.getIoBytesRead(), decimal)
+                .assignParentLabel(IO_BYTES_READ_LABEL);
 
-        tableEntry.getTableHead().getRow().addCells(new TableCellEntry("io_bytes_read", 3, 1), new TableCellEntry("io_bytes_write", 3, 1));
-        tableEntry.getTableBody().addRows(new TableRowEntry(), new TableRowEntry());
+        DataCollectionBuilder bytesWriteBuilder =
+            generateDataCollection(TakeDockerEnvironment.statsBeforeMethod.getIoBytesWrite(),
+                                   TakeDockerEnvironment.statsAfterMethod.getIoBytesWrite(), decimal)
+                .assignParentLabel(IO_BYTES_WRITE_LABEL);
 
-        addCellsHeader(tableEntry.getTableBody().getRows().get(0), 2);
-        TableRowEntry tableRowEntry = tableEntry.getTableBody().getRows().get(1);
-        addCells(tableRowEntry, TakeDockerEnvironment.statsBeforeMethod.getIoBytesRead(),
-                TakeDockerEnvironment.statsAfterMethod.getIoBytesRead(), decimal);
-        addCells(tableRowEntry, TakeDockerEnvironment.statsBeforeMethod.getIoBytesWrite(),
-                TakeDockerEnvironment.statsAfterMethod.getIoBytesWrite(), decimal);
-
-        groupEntry.getPropertyEntries().add(tableEntry);
-
-        return  groupEntry;
-    }**/
-
-    /**private TableEntry createContainerStatMemoryGroup(Boolean decimal) {
-
-        TableBuilder tableBuilder = Reporter.createTable(MEMORY_STATISTICS);
-        tableBuilder.addHeaderRow(USAGE, MAX_USAGE, LIMIT);
-        tableBuilder.add
-
-        TableEntry tableEntry = new TableEntry();
-
-        tableEntry.getTableHead().getRow().addCells(new TableCellEntry("usage", 3, 1), new TableCellEntry("max_usage", 3, 1), new TableCellEntry("limit"));
-        tableEntry.getTableBody().addRows(new TableRowEntry(), new TableRowEntry());
-        addCellsHeader(tableEntry.getTableBody().getRows().get(0), 2);
-
-        TableRowEntry tableRowEntry = tableEntry.getTableBody().getRows().get(1);
-        addCells(tableRowEntry,TakeDockerEnvironment.statsBeforeMethod.getUsage(),
-                TakeDockerEnvironment.statsAfterMethod.getUsage(), decimal);
-        addCells(tableRowEntry, TakeDockerEnvironment.statsBeforeMethod.getMaxUsage(),
-                TakeDockerEnvironment.statsAfterMethod.getMaxUsage(), decimal);
-        tableRowEntry.addCell(new TableCellEntry(getHumanReadbale(TakeDockerEnvironment.statsBeforeMethod.getLimit(), decimal)));
-
-        groupEntry.getPropertyEntries().add(tableEntry);
-
-        return  groupEntry;
-    }**/
-
-    /**private PropertyEntry createContainerStatNetworksGroup(Boolean decimal) {
-
-        GroupEntry groupEntry = new GroupEntry("Networks statistics");
-
-        Map<String, Map<String, Long>> networksBeforeTest = TakeDockerEnvironment.statsBeforeMethod.getNetworks();
-
-        Map<String, Map<String, Long>> networksAfterTest = TakeDockerEnvironment.statsBeforeMethod.getNetworks();
-
-        TableEntry tableEntry = createTableForNetwork(networksBeforeTest, networksAfterTest, decimal);
-
-        groupEntry.getPropertyEntries().add(tableEntry);
-
-        return  groupEntry;
+        return Reporter.createDataCollection("IO statistics")
+            .addDataCollection(bytesReadBuilder, bytesWriteBuilder)
+            .build();
     }
 
-    /**private TableEntry createTableForNetwork(Map<String, Map<String, Long>> networksBeforeTest, Map<String, Map<String, Long>> networksAfterTest, Boolean decimal) {
-        TableEntry tableEntry = new TableEntry();
-        tableEntry.getTableHead().getRow().addCells(new TableCellEntry("Adapter"), new TableCellEntry("rx_bytes", 3, 1), new TableCellEntry("tx_bytes", 3, 1));
-        tableEntry.getTableBody().addRow(new TableRowEntry());
-        tableEntry.getTableBody().getRows().get(0).addCell(new TableCellEntry());
-        addCellsHeader(tableEntry.getTableBody().getRows().get(0), 2);
-        for (String adapter : networksBeforeTest.keySet()) {
-            if (networksBeforeTest.containsKey(adapter) && networksAfterTest.containsKey(adapter)) {
-                TableRowEntry tableRow = addRowsForNetwork(networksBeforeTest.get(adapter), networksAfterTest.get(adapter), decimal, adapter);
-                tableEntry.getTableBody().addRow(tableRow);
-            }
-        }
+    private DataCollectionEntry createContainerStatMemoryGroup(Boolean decimal) {
 
-        return tableEntry;
-    }**/
+        DataCollectionBuilder usageBuilder =
+            generateDataCollection(TakeDockerEnvironment.statsBeforeMethod.getUsage(),
+                                   TakeDockerEnvironment.statsAfterMethod.getUsage(), decimal)
+                .assignParentLabel(USAGE_LABEL);
+
+        DataCollectionBuilder maxUsageBuilder =
+            generateDataCollection(TakeDockerEnvironment.statsBeforeMethod.getMaxUsage(),
+                                   TakeDockerEnvironment.statsAfterMethod.getMaxUsage(), decimal)
+                .assignParentLabel(MAX_USAGE_LABEL);
+
+        return Reporter.createDataCollection(MEMORY_STATISTICS)
+            .addDataCollection(usageBuilder, maxUsageBuilder)
+            .addByteDataItem(TakeDockerEnvironment.statsBeforeMethod.getLimit(), decimal, LIMIT_LABEL)
+            .build();
+    }
+
+    private DataCollectionEntry createContainerStatNetworksGroup(Boolean decimal) {
 
 
-    /**private TableRowEntry addRowsForNetwork(Map<String, Long> before, Map<String, Long> after, Boolean decimal, String adapter) {
+        Map<String, Map<String, Long>> networksBeforeTest = TakeDockerEnvironment.statsBeforeMethod.getNetworks();
+        Map<String, Map<String, Long>> networksAfterTest = TakeDockerEnvironment.statsBeforeMethod.getNetworks();
 
-        TableRowEntry tableRowEntry = new TableRowEntry();
+        DataCollectionBuilder networkCollection = Reporter.createDataCollection("Networks statistics");
 
-        tableRowEntry.addCell(new TableCellEntry(adapter));
-        addCells(tableRowEntry, before.get("rx_bytes"), after.get("rx_bytes"), decimal);
-        addCells(tableRowEntry, before.get("tx_bytes"), after.get("tx_bytes"), decimal);
+        networksBeforeTest.keySet().stream()
+            .filter(adapter -> networksBeforeTest.containsKey(adapter) && networksAfterTest.containsKey(adapter))
+            .forEach(adapter -> {
 
-        return tableRowEntry;
-    }**/
+                Label adapterLabel = new Label(adapter).parent(ADAPTER_LABEL);
+
+                Map<String, Long> before = networksBeforeTest.get(adapter);
+                Map<String, Long> after = networksAfterTest.get(adapter);
+
+                DataCollectionBuilder rxCollection =
+                    generateDataCollection(before.get("rx_bytes"), after.get("rx_bytes"), decimal)
+                        .assignParentLabel(RX_BYTES_LABEL);
+                DataCollectionBuilder txCollection =
+                    generateDataCollection(before.get("tx_bytes"), after.get("tx_bytes"), decimal)
+                        .assignParentLabel(TX_BYTES_LABEL);
+
+                networkCollection
+                    .addDataCollection(rxCollection, adapterLabel)
+                    .addDataCollection(txCollection, adapterLabel);
+
+            });
+
+        return networkCollection.build();
+    }
+
+    private DataCollectionBuilder generateDataCollection(Long beforeTest, Long afterTest, Boolean decimal) {
+        return Reporter.createDataCollection("")
+            .addByteDataItem(beforeTest, decimal, BEFORE_TEST_LABEL)
+            .addByteDataItem(afterTest, decimal, AFTER_TEST_LABEL)
+            .addByteDataItem(afterTest - beforeTest, decimal, USE_LABEL);
+    }
 
     public void captureStats(DockerClientExecutor executor, CubeRegistry cubeRegistry, String when, Boolean decimal) throws IOException {
-        /**if (executor != null) {
+        if (executor != null) {
             List<Cube<?>> containers = cubeRegistry.getCubes();
             for (Cube<?> container : containers) {
                 String name = container.getId();
                 Statistics statistics = executor.statsContainer(name);
                 if ("before".equals(when)) {
-                    this.statsBeforeMethod = updateStats(statistics);
+                    this.statsBeforeMethod = ContainerStatsBuilder.updateStats(statistics);
                 } else {
-                    this.statsAfterMethod = updateStats(statistics);
+                    this.statsAfterMethod = ContainerStatsBuilder.updateStats(statistics);
                     createEntryAndFire(name, decimal);
                 }
             }
-        }**/
+        }
 
     }
 
@@ -412,21 +428,14 @@ public class TakeDockerEnvironment {
         return networksDir.toFile();
     }
 
-    private String getHumanReadbale(Long bytes, Boolean decimal) {
-        return NumberConversion.humanReadableByteCount(bytes, decimal);
+    private void createEntryAndFire(String name, Boolean decimal) {
+
+        Reporter
+            .createReport(name + " Statistics")
+            .addEntries(createContainerStatMemoryGroup(decimal),
+                        createContainerStatsIOGroup(decimal),
+                        createContainerStatNetworksGroup(decimal))
+        .inSection(new TestMethodSection())
+        .fire(reportEvent);
     }
-
-    /**private void addCellsHeader(TableRowEntry tableRowEntry, Integer params) {
-        for (int i = 0; i < params; i++) {
-            tableRowEntry.addCells(new TableCellEntry("Before Test"), new TableCellEntry("After Test"), new TableCellEntry("Use"));
-        }
-    }
-
-    private void addCells(TableRowEntry tableRowEntry, Long beforeTest, Long afterTest, Boolean decimal) {
-        tableRowEntry.addCells(
-                new TableCellEntry(getHumanReadbale(beforeTest, decimal)),
-                new TableCellEntry(getHumanReadbale(afterTest, decimal)),
-                new TableCellEntry(getHumanReadbale((afterTest - beforeTest), decimal)));
-    }**/
-
 }
